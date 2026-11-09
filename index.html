@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d1a">
+<title>Voice-to-Video Studio · prototype v2</title>
+<style>
+  :root { --bg:#0b0d1a; --panel:#12152a; --panel2:#181c36; --line:#272c4d; --text:#eceefb; --mute:#8d93b8; --a1:#8b5cf6; --a2:#38bdf8; --bad:#ff6b81; --good:#4ade80; --warn:#fbbf24; }
+  * { box-sizing:border-box; }
+  body { margin:0; color:var(--text); background:radial-gradient(900px 500px at 15% -10%, #2a2470 0%, transparent 60%), var(--bg); font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
+  .wrap { max-width:560px; margin:0 auto; padding:14px 14px 56px; }
+  header { display:flex; align-items:center; gap:12px; margin:4px 0 14px; }
+  header svg { flex:none; }
+  header h1 { font-size:19px; margin:0; line-height:1.15; }
+  header .tag { color:var(--mute); font-size:13px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; border:1px solid var(--line); color:var(--mute); vertical-align:middle; }
+  .pill.good { color:var(--good); border-color:var(--good); }
+  .pill.bad { color:var(--bad); border-color:var(--bad); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px; }
+  .card h2 { display:flex; align-items:center; gap:10px; font-size:15px; margin:0 0 12px; }
+  .num { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--a1); font-size:13px; font-weight:700; flex:none; }
+  fieldset { border:0; margin:0; padding:0; min-width:0; }
+  fieldset:disabled { opacity:.55; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row.tight { gap:6px; }
+  button, select, input[type=text] { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:10px 14px; }
+  button { cursor:pointer; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  button.primary, .btn.primary { background:linear-gradient(90deg,var(--a1),var(--a2)); color:#fff; border:0; font-weight:700; }
+  button.danger { background:var(--bad); color:#2a0a10; border-color:var(--bad); font-weight:700; }
+  .btn { display:inline-block; text-decoration:none; color:var(--text); border-radius:12px; padding:10px 14px; background:var(--panel2); border:1px solid var(--line); }
+  input[type=text] { width:100%; }
+  input[type=color] { width:44px; height:40px; padding:2px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; }
+  input[type=range] { width:100%; accent-color:var(--a2); }
+  label.file span { display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:10px 14px; cursor:pointer; }
+  label.file input { display:none; }
+  label.chk { display:flex; align-items:center; gap:8px; color:var(--mute); font-size:13px; }
+  label.chk input { width:18px; height:18px; accent-color:var(--a2); }
+  .lbl { color:var(--mute); font-size:12px; margin:12px 0 6px; }
+  .tiles { display:grid; gap:8px; }
+  .tiles.c2 { grid-template-columns:1fr 1fr; }
+  .tiles.c3 { grid-template-columns:repeat(3,1fr); }
+  .tile { display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 6px; border-radius:14px; }
+  .tile small { color:var(--mute); font-size:11px; text-align:center; line-height:1.25; }
+  .tile.on { border-color:var(--a2); box-shadow:0 0 0 1px var(--a2) inset, 0 0 18px #38bdf833; }
+  .tile b { font-size:15px; }
+  .seg { display:flex; gap:4px; background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:3px; }
+  .seg button { flex:1; border:0; background:transparent; color:var(--mute); padding:8px; border-radius:9px; }
+  .seg button.on { background:#2a2f5e; color:var(--text); }
+  .sw { width:38px; height:38px; border-radius:11px; border:2px solid transparent; padding:0; }
+  .sw.on { border-color:#fff; }
+  .stage { display:flex; justify-content:center; background:#05060d; border-radius:12px; padding:8px; }
+  canvas { max-width:100%; max-height:56vh; background:#000; border-radius:8px; }
+  .status { font-size:13px; color:var(--mute); margin-top:8px; min-height:18px; }
+  .status.warn { color:var(--warn); }
+  .hint { font-size:12px; color:var(--mute); margin-top:8px; }
+  .bar { height:6px; background:var(--panel2); border-radius:4px; overflow:hidden; margin-top:10px; }
+  .bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--a1),var(--a2)); }
+  pre { white-space:pre-wrap; word-break:break-word; font:12px/1.5 ui-monospace,Menlo,Consolas,monospace; background:#080a14; border:1px solid var(--line); border-radius:10px; padding:10px; margin:0; max-height:320px; overflow:auto; }
+  video { width:100%; max-height:60vh; background:#000; border-radius:10px; margin-top:10px; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg width="46" height="40" viewBox="0 0 46 40" aria-hidden="true">
+      <g fill="#8b5cf6"><rect x="2" y="15" width="4" height="10" rx="2"/><rect x="9" y="8" width="4" height="24" rx="2"/><rect x="16" y="2" width="4" height="36" rx="2" fill="#a78bfa"/><rect x="23" y="10" width="4" height="20" rx="2" fill="#7dd3fc"/><rect x="30" y="5" width="4" height="30" rx="2" fill="#38bdf8"/><rect x="37" y="14" width="4" height="12" rx="2" fill="#7dd3fc"/></g>
+    </svg>
+    <div>
+      <h1>Voice-to-Video Studio <span class="pill">prototype v2</span></h1>
+      <div class="tag">Record. Design. Share.</div>
+    </div>
+  </header>
+
+  <fieldset id="locker">
+    <div class="card">
+      <h2><span class="num">1</span>Record or upload audio</h2>
+      <div class="row">
+        <button id="recBtn" class="primary">● Record</button>
+        <button id="pauseBtn" disabled>Pause</button>
+        <button id="stopBtn" disabled>Stop</button>
+        <label class="file"><span>Upload</span><input id="file" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg"></label>
+      </div>
+      <div class="status" id="audioStatus">No audio yet. Recording needs HTTPS; upload works anywhere.</div>
+      <label class="chk" style="margin-top:8px"><input id="boost" type="checkbox" checked><span>Boost quiet audio <span id="boostInfo"></span></span></label>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">2</span>Choose a visual style</h2>
+      <div class="tiles c2" id="styleTiles">
+        <button class="tile" data-v="wave" type="button">
+          <svg width="72" height="30" viewBox="0 0 80 32"><polyline fill="none" stroke="#7dd3fc" stroke-width="2.5" stroke-linejoin="round" points="0,16 8,16 12,6 16,26 20,10 24,22 30,4 36,28 42,8 48,24 54,12 60,20 66,15 72,16 80,16"/></svg>
+          <b>Waveform</b><small>Live line that follows your voice</small>
+        </button>
+        <button class="tile on" data-v="eq" type="button">
+          <svg width="72" height="30" viewBox="0 0 80 32"><g fill="#a78bfa"><rect x="4" y="22" width="7" height="10" rx="3"/><rect x="15" y="12" width="7" height="20" rx="3"/><rect x="26" y="18" width="7" height="14" rx="3"/><rect x="37" y="6" width="7" height="26" rx="3" fill="#7dd3fc"/><rect x="48" y="14" width="7" height="18" rx="3" fill="#7dd3fc"/><rect x="59" y="24" width="7" height="8" rx="3"/><rect x="70" y="10" width="7" height="22" rx="3"/></g></svg>
+          <b>Equaliser</b><small>Bars across the voice range</small>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">3</span>Customise</h2>
+      <div class="seg" id="bgSeg">
+        <button type="button" data-v="gradient" class="on">Gradient</button>
+        <button type="button" data-v="solid">Solid</button>
+        <button type="button" data-v="image">Image</button>
+      </div>
+
+      <div id="paneGradient">
+        <div class="lbl">Presets</div>
+        <div class="row tight" id="swatches"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input id="c1" type="color" value="#4c1d95" title="Colour 1 (background)">
+        <input id="c2" type="color" value="#0b1026" title="Colour 2 (gradient end)">
+        <span class="hint" style="margin:0" id="bgColourHint">Background colours</span>
+      </div>
+      <div id="paneImage" class="hide">
+        <div class="lbl">Background image</div>
+        <div class="row">
+          <label class="file"><span>Choose image</span><input id="imgFile" type="file" accept="image/*"></label>
+          <span class="hint" style="margin:0" id="imgStatus">No image yet. Falls back to the gradient.</span>
+        </div>
+        <div class="lbl">Darken image for readable text</div>
+        <input id="dim" type="range" min="0" max="0.7" step="0.05" value="0.35">
+      </div>
+
+      <div class="lbl">Title and subtitle</div>
+      <input id="title" type="text" placeholder="Title (optional)" value="My voice note" maxlength="80">
+      <input id="sub" type="text" placeholder="Subtitle (optional)" value="" maxlength="100" style="margin-top:8px">
+      <div class="row" style="margin-top:8px">
+        <select id="font">
+          <option value="sans">Font: Bold sans</option>
+          <option value="serif">Font: Serif</option>
+          <option value="italic">Font: Italic</option>
+        </select>
+        <select id="tsize">
+          <option value="s">Text: Small</option>
+          <option value="m" selected>Text: Medium</option>
+          <option value="l">Text: Large</option>
+        </select>
+      </div>
+
+      <div class="lbl">Visual colours</div>
+      <div class="row">
+        <input id="c3" type="color" value="#38bdf8" title="Visual colour (left)">
+        <input id="c4" type="color" value="#a78bfa" title="Visual colour (right)">
+        <label class="chk"><input id="glow" type="checkbox"><span>Glow (heavier on phones)</span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">4</span>Size and format</h2>
+      <div class="tiles c3" id="ratioTiles">
+        <button class="tile on" data-v="9:16" type="button"><b>9:16</b><small>Reels, TikTok, Shorts, Status</small></button>
+        <button class="tile" data-v="1:1" type="button"><b>1:1</b><small>Square feed posts</small></button>
+        <button class="tile" data-v="4:5" type="button"><b>4:5</b><small>Portrait feed posts</small></button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <select id="res">
+          <option value="720" selected>720p (recommended)</option>
+          <option value="1080">1080p (heavier)</option>
+        </select>
+        <select id="fmt">
+          <option value="auto">Format: auto (MP4 first)</option>
+          <option value="mp4">Force MP4</option>
+          <option value="webm">Force WebM</option>
+        </select>
+      </div>
+      <div class="hint">Sizes are conveniences only. Platforms can change their rules and may recompress your video.</div>
+    </div>
+  </fieldset>
+
+  <div class="card">
+    <h2><span class="num">5</span>Preview and generate</h2>
+    <div class="stage"><canvas id="cv"></canvas></div>
+    <div class="row" style="margin-top:10px">
+      <button id="playBtn" disabled>▶ Preview</button>
+      <button id="exportBtn" class="primary" disabled>Generate video</button>
+      <button id="cancelBtn" class="danger hide">Cancel</button>
+    </div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="status" id="expStatus">Export runs in real time. Keep this tab open and the screen on.</div>
+  </div>
+
+  <div class="card hide" id="resultCard">
+    <h2>Result <span id="resPill" class="pill"></span></h2>
+    <div class="row">
+      <a id="dl" class="btn primary" download>Download</a>
+      <button id="shareBtn" class="hide" type="button">Share…</button>
+    </div>
+    <video id="outVideo" controls playsinline></video>
+  </div>
+
+  <div class="card">
+    <h2>Diagnostics report</h2>
+    <div class="row" style="margin-bottom:8px">
+      <button id="copyBtn" type="button">Copy report</button>
+      <button id="clearBtn" type="button">Clear</button>
+    </div>
+    <pre id="log"></pre>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), g = cv.getContext('2d');
+  const layer = document.createElement('canvas'), lg = layer.getContext('2d');
+  const logEl = $('log');
+  const FPS = 30;
+  const BARS = 40;
+
+  const SIZES = {
+    720:  { '9:16': [720, 1280],  '1:1': [720, 720],   '4:5': [720, 900] },
+    1080: { '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
+  };
+  // Vertical positions as a fraction of height. 9:16 keeps the content clear of typical top/bottom app overlays.
+  const LAYOUT = {
+    '9:16': { titleY: 0.20, visCY: 0.50, progY: 0.76 },
+    '1:1':  { titleY: 0.17, visCY: 0.54, progY: 0.88 },
+    '4:5':  { titleY: 0.16, visCY: 0.54, progY: 0.88 }
+  };
+  const PRESETS = [
+    ['#4c1d95', '#0b1026'], ['#f472b6', '#fb923c'], ['#0ea5e9', '#1e1b4b'],
+    ['#0f172a', '#d946ef'], ['#134e4a', '#052e16']
+  ];
+
+  const state = { style: 'eq', bg: 'gradient', ratio: '9:16', res: 720, img: null, normGain: 1 };
+  const cfg = {};
+  let W = 720, H = 1280, unit = 720, vGrad = null;
+  let ac = null, analyser = null, gainNode = null, freq = null, td = null, edges = null;
+  let audioBuffer = null;
+  let previewSrc = null, previewing = false, exporting = false, cancelRequested = false;
+  let playStartAt = 0, playDur = 0;
+  let lastDraw = 0, drawCount = 0, worstGap = 0, uiTick = 0;
+  let hiddenDuring = false, wakeOk = false, wakeLock = null, blobUrl = null;
+
+  // ---------- logging ----------
+  function log(msg) {
+    logEl.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  log('Prototype v2');
+  log('UA: ' + navigator.userAgent);
+  log('Secure context: ' + window.isSecureContext);
+  log('MediaRecorder: ' + (typeof MediaRecorder !== 'undefined') +
+      ' | captureStream: ' + (typeof cv.captureStream === 'function') +
+      ' | share: ' + (!!navigator.share) + ' | wakeLock: ' + (!!navigator.wakeLock));
+
+  // ---------- config from the controls ----------
+  function syncCfg() {
+    cfg.c1 = $('c1').value; cfg.c2 = $('c2').value; cfg.c3 = $('c3').value; cfg.c4 = $('c4').value;
+    cfg.glow = $('glow').checked;
+    cfg.title = $('title').value.trim(); cfg.sub = $('sub').value.trim();
+    cfg.font = $('font').value; cfg.tsize = $('tsize').value;
+    cfg.dim = parseFloat($('dim').value) || 0;
+  }
+  syncCfg();
+
+  // ---------- audio context ----------
+  function computeEdges() {
+    const binHz = ac.sampleRate / analyser.fftSize;
+    const lo = 90, hi = Math.min(6500, ac.sampleRate * 0.45);
+    edges = [];
+    let prev = Math.max(1, Math.round(lo / binHz));
+    edges.push(prev);
+    for (let i = 1; i <= BARS; i++) {
+      let b = Math.round(lo * Math.pow(hi / lo, i / BARS) / binHz);
+      if (b <= prev) b = prev + 1;
+      edges.push(b); prev = b;
+    }
+  }
+
+  function getCtx() {
+    if (!ac) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ac = new AC();
+      gainNode = ac.createGain();
+      analyser = ac.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.7;
+      analyser.minDecibels = -90;
+      analyser.maxDecibels = -20;
+      freq = new Uint8Array(analyser.frequencyBinCount);
+      td = new Uint8Array(analyser.fftSize);
+      computeEdges();
+      log('AudioContext sample rate: ' + ac.sampleRate + ' Hz');
+    }
+    return ac;
+  }
+
+  function decode(arrayBuf) {
+    const c = getCtx();
+    return new Promise((res, rej) => {
+      let done = false;
+      const ok = b => { if (!done) { done = true; res(b); } };
+      const no = e => { if (!done) { done = true; rej(e || new Error('decode failed')); } };
+      try {
+        const p = c.decodeAudioData(arrayBuf, ok, no);
+        if (p && p.then) p.then(ok, no);
+      } catch (e) { no(e); }
+    });
+  }
+
+  function measureLoudness(buf) {
+    let peak = 0, sum = 0, n = 0;
+    const chs = Math.min(2, buf.numberOfChannels);
+    for (let c = 0; c < chs; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < d.length; i++) {
+        const a = Math.abs(d[i]);
+        if (a > peak) peak = a;
+        if (a > 0.005) { sum += a * a; n++; }
+      }
+    }
+    const rms = n ? Math.sqrt(sum / n) : 0;
+    return { peak, rms,
+      peakDb: peak > 0 ? 20 * Math.log10(peak) : -Infinity,
+      rmsDb: rms > 0 ? 20 * Math.log10(rms) : -Infinity };
+  }
+
+  // Raise speech toward about -16 dBFS RMS, never past -1 dBFS peak, max +20 dB, never lower it.
+  function pickGain(l) {
+    if (l.peak < 1e-4 || l.rms <= 0) return 1;
+    const gRms = Math.pow(10, (-16 - l.rmsDb) / 20);
+    const gPeak = Math.pow(10, (-1 - l.peakDb) / 20);
+    return Math.max(1, Math.min(gRms, gPeak, 10));
+  }
+
+  function updateBoostInfo() {
+    const db = 20 * Math.log10(state.normGain);
+    $('boostInfo').textContent = audioBuffer
+      ? ($('boost').checked ? `(+${db.toFixed(1)} dB)` : '(off)')
+      : '';
+  }
+
+  function fmtTime(s) {
+    s = Math.round(s);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  function updateLengthNote() {
+    const el = $('expStatus');
+    if (!audioBuffer) return;
+    const d = audioBuffer.duration;
+    if (d > 120) {
+      el.className = 'status warn';
+      el.textContent = `Long clip: export takes about ${fmtTime(d)} in real time. Phones may struggle; try under 2 minutes first.`;
+    } else {
+      el.className = 'status';
+      el.textContent = `Export takes about ${fmtTime(d)} in real time. Keep this tab open and the screen on.`;
+    }
+  }
+
+  async function loadBlob(blob, label) {
+    try {
+      const ab = await blob.arrayBuffer();
+      audioBuffer = await decode(ab);
+      const d = audioBuffer.duration;
+      const l = measureLoudness(audioBuffer);
+      state.normGain = pickGain(l);
+      $('audioStatus').textContent = `${label}: ${d.toFixed(1)}s, ${audioBuffer.sampleRate} Hz, ${audioBuffer.numberOfChannels} ch`;
+      log(`Audio loaded (${label}): ${d.toFixed(2)}s, ${(blob.size / 1024).toFixed(0)} KB, type=${blob.type || 'unknown'}`);
+      log(`Loudness: peak ${isFinite(l.peakDb) ? l.peakDb.toFixed(1) : 'silent'} dBFS, speech RMS ${isFinite(l.rmsDb) ? l.rmsDb.toFixed(1) : 'n/a'} dBFS, boost +${(20 * Math.log10(state.normGain)).toFixed(1)} dB`);
+      updateBoostInfo();
+      updateLengthNote();
+    } catch (e) {
+      audioBuffer = null;
+      updateBoostInfo();
+      $('audioStatus').textContent = 'Could not decode that audio: ' + (e && e.message ? e.message : 'unsupported file');
+      log('Decode FAILED: ' + (e && e.message ? e.message : e));
+    }
+    refreshButtons();
+  }
+
+  $('boost').addEventListener('change', updateBoostInfo);
+
+  // ---------- upload ----------
+  $('file').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    stopPreview();
+    await loadBlob(f, 'Uploaded ' + f.name);
+  });
+
+  // ---------- recording ----------
+  let rec = null, recChunks = [], recStream = null, recTimer = null;
+  let recStart = 0, recPausedAt = 0, recPausedTotal = 0;
+
+  function pickAudioMime() {
+    const c = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'];
+    return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+  }
+
+  function tickRec() {
+    if (!rec) return;
+    const now = rec.state === 'paused' ? recPausedAt : performance.now();
+    const ms = now - recStart - recPausedTotal;
+    $('audioStatus').textContent = `${rec.state === 'paused' ? 'Paused' : 'Recording'} ${(ms / 1000).toFixed(1)}s`;
+  }
+
+  $('recBtn').addEventListener('click', async () => {
+    if (rec) return;
+    stopPreview();
+    getCtx(); // create inside the tap (iOS needs a user gesture)
+    try {
+      recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      $('audioStatus').textContent = 'Microphone blocked or unavailable: ' + err.message + '. Use Upload instead.';
+      log('getUserMedia FAILED: ' + err.name + ' ' + err.message);
+      return;
+    }
+    const mime = pickAudioMime();
+    try {
+      rec = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined);
+    } catch (err) {
+      recStream.getTracks().forEach(t => t.stop());
+      $('audioStatus').textContent = 'Could not start recording: ' + err.message + '. Use Upload instead.';
+      log('MediaRecorder (audio) FAILED: ' + err.message);
+      return;
+    }
+    recChunks = [];
+    recPausedTotal = 0;
+    rec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+    rec.onstop = async () => {
+      clearInterval(recTimer);
+      recStream.getTracks().forEach(t => t.stop());
+      const type = (rec && rec.mimeType) || mime || 'audio/webm';
+      const blob = new Blob(recChunks, { type });
+      rec = null;
+      $('recBtn').disabled = false; $('pauseBtn').disabled = true; $('stopBtn').disabled = true;
+      $('pauseBtn').textContent = 'Pause';
+      await loadBlob(blob, 'Recorded');
+    };
+    rec.start(500);
+    recStart = performance.now();
+    recTimer = setInterval(tickRec, 200);
+    log('Recording started, mime=' + (rec.mimeType || 'default'));
+    $('recBtn').disabled = true; $('pauseBtn').disabled = false; $('stopBtn').disabled = false;
+  });
+
+  $('pauseBtn').addEventListener('click', () => {
+    if (!rec) return;
+    if (rec.state === 'recording') {
+      rec.pause(); recPausedAt = performance.now(); $('pauseBtn').textContent = 'Resume';
+    } else if (rec.state === 'paused') {
+      rec.resume(); recPausedTotal += performance.now() - recPausedAt; $('pauseBtn').textContent = 'Pause';
+    }
+  });
+  $('stopBtn').addEventListener('click', () => { if (rec && rec.state !== 'inactive') rec.stop(); });
+
+  // ---------- composition layer (background + text), drawn once per setting change ----------
+  function wrapLines(ctx, text, maxW, maxLines) {
+    const words = text.split(/\s+/).filter(Boolean);
+    const lines = []; let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; } else cur = test;
+    }
+    if (cur) lines.push(cur);
+    if (lines.length > maxLines) {
+      lines.length = maxLines;
+      lines[maxLines - 1] = lines[maxLines - 1].replace(/\s*\S*$/, '') + '…';
+    }
+    return lines;
+  }
+
+  function rebuildLayer() {
+    const [w, h] = SIZES[state.res][state.ratio];
+    W = w; H = h; unit = Math.min(w, h);
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    layer.width = w; layer.height = h;
+    const L = LAYOUT[state.ratio];
+
+    // background
+    if (state.bg === 'image' && state.img) {
+      const im = state.img;
+      const s = Math.max(w / im.width, h / im.height);
+      const dw = im.width * s, dh = im.height * s;
+      lg.drawImage(im, (w - dw) / 2, (h - dh) / 2, dw, dh);
+      lg.fillStyle = `rgba(0,0,0,${cfg.dim})`;
+      lg.fillRect(0, 0, w, h);
+    } else if (state.bg === 'solid') {
+      lg.fillStyle = cfg.c1; lg.fillRect(0, 0, w, h);
+    } else {
+      const gr = lg.createLinearGradient(0, 0, 0, h);
+      gr.addColorStop(0, cfg.c1); gr.addColorStop(1, cfg.c2);
+      lg.fillStyle = gr; lg.fillRect(0, 0, w, h);
+    }
+
+    // text (system fonts only: canvas can only draw fonts that are already loaded)
+    const stack = {
+      sans: 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
+      serif: 'Georgia,"Times New Roman",serif',
+      italic: 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif'
+    }[cfg.font] || 'sans-serif';
+    const weight = cfg.font === 'italic' ? 'italic 800' : '700';
+    const px = Math.round(unit * ({ s: 0.055, m: 0.07, l: 0.09 }[cfg.tsize] || 0.07));
+    lg.textAlign = 'center'; lg.textBaseline = 'middle';
+    let y = h * L.titleY;
+    if (cfg.title) {
+      lg.font = `${weight} ${px}px ${stack}`;
+      const lines = wrapLines(lg, cfg.title, w * 0.82, 4);
+      const lh = px * 1.25;
+      lg.fillStyle = '#fff';
+      lg.shadowColor = 'rgba(0,0,0,.45)'; lg.shadowBlur = px * 0.15;
+      lines.forEach((ln, i) => lg.fillText(ln, w / 2, y + i * lh));
+      lg.shadowBlur = 0; lg.shadowColor = 'transparent';
+      y += (lines.length - 1) * lh + lh * 0.95;
+    }
+    if (cfg.sub) {
+      const sp = Math.max(14, Math.round(px * 0.5));
+      lg.font = `500 ${sp}px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif`;
+      const lines = wrapLines(lg, cfg.sub, w * 0.8, 3);
+      lg.fillStyle = 'rgba(255,255,255,.85)';
+      lg.shadowColor = 'rgba(0,0,0,.45)'; lg.shadowBlur = sp * 0.2;
+      lines.forEach((ln, i) => lg.fillText(ln, w / 2, y + sp * 0.4 + i * sp * 1.3));
+      lg.shadowBlur = 0; lg.shadowColor = 'transparent';
+    }
+
+    // visual fill, bound to the visible canvas context
+    vGrad = g.createLinearGradient(w * 0.08, 0, w * 0.92, 0);
+    vGrad.addColorStop(0, cfg.c3); vGrad.addColorStop(1, cfg.c4);
+  }
+
+  // ---------- per-frame drawing (the same code runs for preview and export) ----------
+  function roundRectPath(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+
+  function drawEq(live, L) {
+    if (live) analyser.getByteFrequencyData(freq);
+    const areaW = W * 0.84, gap = areaW / BARS * 0.35;
+    const bw = (areaW - gap * (BARS - 1)) / BARS;
+    const x0 = (W - areaW) / 2;
+    const maxH = unit * 0.34;
+    const base = H * L.visCY + maxH / 2;
+    g.beginPath();
+    for (let i = 0; i < BARS; i++) {
+      let v = 0;
+      if (live) {
+        let m = 0;
+        for (let b = edges[i]; b < edges[i + 1]; b++) if (freq[b] > m) m = freq[b];
+        v = Math.pow(m / 255, 1.4) * (1 + 0.9 * i / BARS); // mild tilt: voices carry less energy in the highs
+        if (v > 1) v = 1;
+      }
+      const bh = Math.max(unit * 0.012, v * maxH);
+      roundRectPath(x0 + i * (bw + gap), base - bh, bw, bh, bw / 2);
+    }
+    g.fill();
+  }
+
+  function drawWave(live, L) {
+    if (live) analyser.getByteTimeDomainData(td);
+    const areaW = W * 0.86, x0 = (W - areaW) / 2;
+    const cy = H * L.visCY, amp = unit * 0.22;
+    const pts = Math.max(40, Math.min(220, Math.floor(areaW / 4)));
+    const step = Math.max(1, Math.floor(td.length / pts));
+    g.globalAlpha = 0.25;
+    g.fillRect(x0, cy - 1, areaW, 2);
+    g.globalAlpha = 1;
+    g.lineWidth = Math.max(3, unit * 0.008);
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath();
+    for (let i = 0; i < pts; i++) {
+      const x = x0 + areaW * i / (pts - 1);
+      let s = live ? (td[i * step] - 128) / 128 : 0;
+      s = Math.max(-1, Math.min(1, s * 1.5));
+      const env = Math.pow(Math.sin(Math.PI * i / (pts - 1)), 0.7);
+      const y = cy - s * amp * env;
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.stroke();
+  }
+
+  function drawFrame(progress, live) {
+    g.drawImage(layer, 0, 0);
+    const L = LAYOUT[state.ratio];
+    g.save();
+    if (cfg.glow) { g.shadowColor = cfg.c3; g.shadowBlur = unit * 0.03; }
+    g.fillStyle = vGrad; g.strokeStyle = vGrad;
+    if (state.style === 'eq') drawEq(live, L); else drawWave(live, L);
+    g.restore();
+    const py = H * L.progY, ph = Math.max(4, unit * 0.006), px = W * 0.08, pw = W * 0.84;
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(px, py, pw, ph);
+    g.fillStyle = '#fff'; g.fillRect(px, py, pw * Math.min(1, Math.max(0, progress)), ph);
+  }
+
+  function redrawIdle() { rebuildLayer(); drawFrame(0, false); }
+
+  function loop() {
+    if (!previewing && !exporting) return;
+    requestAnimationFrame(loop);
+    const now = performance.now();
+    if (now - lastDraw < 1000 / FPS - 4) return; // draw at ~30 fps, matching the capture rate
+    if (lastDraw && exporting) worstGap = Math.max(worstGap, now - lastDraw);
+    lastDraw = now;
+    const elapsed = ac.currentTime - playStartAt;
+    const prog = playDur ? elapsed / playDur : 0;
+    drawFrame(prog, true);
+    drawCount++;
+    if (exporting && ++uiTick % 6 === 0) {
+      $('prog').style.width = Math.min(100, prog * 100) + '%';
+      $('expStatus').className = 'status';
+      $('expStatus').textContent = `Generating… ${Math.min(elapsed, playDur).toFixed(1)}s / ${playDur.toFixed(1)}s`;
+    }
+  }
+
+  // ---------- audio chain ----------
+  function buildChain(toDest) {
+    gainNode.gain.value = $('boost').checked ? state.normGain : 1;
+    try { analyser.disconnect(); } catch (_) {}
+    try { gainNode.disconnect(); } catch (_) {}
+    const src = ac.createBufferSource();
+    src.buffer = audioBuffer;
+    src.connect(gainNode);
+    gainNode.connect(analyser);
+    analyser.connect(toDest || ac.destination);
+    return src;
+  }
+
+  // ---------- preview ----------
+  function stopPreview() {
+    if (previewSrc) { try { previewSrc.onended = null; previewSrc.stop(); } catch (_) {} previewSrc = null; }
+    previewing = false;
+    $('playBtn').textContent = '▶ Preview';
+    if (!exporting) drawFrame(0, false);
+  }
+
+  $('playBtn').addEventListener('click', async () => {
+    if (previewing) { stopPreview(); return; }
+    if (!audioBuffer || exporting) return;
+    await getCtx().resume();
+    syncCfg();
+    previewSrc = buildChain(null);
+    playDur = audioBuffer.duration;
+    playStartAt = ac.currentTime;
+    previewSrc.onended = () => stopPreview();
+    previewSrc.start();
+    previewing = true;
+    lastDraw = 0;
+    $('playBtn').textContent = '■ Stop';
+    requestAnimationFrame(loop);
+  });
+
+  // ---------- controls ----------
+  function bindTiles(containerId, onPick) {
+    const box = $(containerId);
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-v]');
+      if (!b || !box.contains(b)) return;
+      box.querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b));
+      onPick(b.dataset.v);
+    });
+  }
+
+  bindTiles('styleTiles', v => { state.style = v; if (!previewing && !exporting) drawFrame(0, false); });
+  bindTiles('ratioTiles', v => { state.ratio = v; redrawIdle(); });
+  bindTiles('bgSeg', v => {
+    state.bg = v;
+    $('paneGradient').classList.toggle('hide', v !== 'gradient');
+    $('paneImage').classList.toggle('hide', v !== 'image');
+    $('c2').classList.toggle('hide', v !== 'gradient');
+    $('bgColourHint').textContent = v === 'solid' ? 'Background colour' : v === 'image' ? 'Fallback colours' : 'Background colours';
+    redrawIdle();
+  });
+  $('res').addEventListener('change', () => { state.res = parseInt($('res').value, 10); redrawIdle(); });
+
+  PRESETS.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sw' + (i === 0 ? ' on' : '');
+    b.style.background = `linear-gradient(180deg,${p[0]},${p[1]})`;
+    b.setAttribute('aria-label', 'Gradient preset ' + (i + 1));
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#swatches .sw').forEach(x => x.classList.toggle('on', x === b));
+      $('c1').value = p[0]; $('c2').value = p[1];
+      syncCfg(); redrawIdle();
+    });
+    $('swatches').appendChild(b);
+  });
+
+  ['c1', 'c2', 'c3', 'c4', 'glow', 'title', 'sub', 'font', 'tsize', 'dim'].forEach(id => {
+    const h = () => {
+      syncCfg();
+      if (id === 'c1' || id === 'c2') document.querySelectorAll('#swatches .sw').forEach(x => x.classList.remove('on'));
+      if (exporting) return;
+      if (previewing) rebuildLayer(); else redrawIdle();
+    };
+    $(id).addEventListener('input', h);
+    $(id).addEventListener('change', h);
+  });
+
+  $('imgFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    const im = new Image();
+    im.onload = () => {
+      // keep a downscaled working copy so big photos don't exhaust phone memory
+      const max = 2000;
+      const s = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(im.naturalWidth * s));
+      c.height = Math.max(1, Math.round(im.naturalHeight * s));
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      state.img = c;
+      URL.revokeObjectURL(url);
+      $('imgStatus').textContent = `${f.name} ready (${c.width}×${c.height})`;
+      log(`Image loaded: ${f.name}, ${im.naturalWidth}x${im.naturalHeight} -> working copy ${c.width}x${c.height}`);
+      if (!exporting) { if (previewing) rebuildLayer(); else redrawIdle(); }
+    };
+    im.onerror = () => {
+      URL.revokeObjectURL(url);
+      $('imgStatus').textContent = 'Could not read that image. Try a JPG or PNG.';
+      log('Image load FAILED: ' + f.name + ' (' + (f.type || 'unknown type') + ')');
+    };
+    im.src = url;
+  });
+
+  function refreshButtons() {
+    const has = !!audioBuffer;
+    $('playBtn').disabled = !has || exporting;
+    $('exportBtn').disabled = !has || exporting;
+    $('locker').disabled = exporting;
+    $('cancelBtn').classList.toggle('hide', !exporting);
+    if (!exporting) { $('recBtn').disabled = !!rec; }
+  }
+
+  // ---------- export ----------
+  function pickVideoMime(pref) {
+    // H.264/AAC strings come first. Plain 'video/mp4' is a last resort because some browsers
+    // then put VP9/Opus inside the .mp4, which WhatsApp and Instagram may reject.
+    const h264 = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=h264,aac'];
+    const bareMp4 = ['video/mp4'];
+    const webm = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=h264,opus', 'video/webm'];
+    const list = pref === 'mp4' ? h264.concat(bareMp4) : pref === 'webm' ? webm : h264.concat(webm, bareMp4);
+    return list.find(m => MediaRecorder.isTypeSupported(m)) || '';
+  }
+
+  async function lockScreen() {
+    wakeOk = false;
+    try {
+      if (navigator.wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeOk = true; log('Wake lock acquired'); }
+      else log('Wake lock not supported here');
+    } catch (e) { log('Wake lock refused: ' + e.message); }
+  }
+  function unlockScreen() { try { if (wakeLock) wakeLock.release(); } catch (_) {} wakeLock = null; }
+
+  $('cancelBtn').addEventListener('click', () => { cancelRequested = true; });
+
+  function endExportUI(msg, cls) {
+    exporting = false;
+    refreshButtons();
+    unlockScreen();
+    const el = $('expStatus');
+    el.className = 'status' + (cls ? ' ' + cls : '');
+    el.textContent = msg;
+    drawFrame(0, false);
+  }
+
+  $('exportBtn').addEventListener('click', async () => {
+    if (!audioBuffer || exporting) return;
+    if (typeof MediaRecorder === 'undefined' || typeof cv.captureStream !== 'function') {
+      log('FAIL: this browser lacks MediaRecorder or canvas.captureStream');
+      $('expStatus').className = 'status warn';
+      $('expStatus').textContent = 'This browser cannot export video (no MediaRecorder / captureStream).';
+      return;
+    }
+    const mime = pickVideoMime($('fmt').value);
+    if (!mime) {
+      log('FAIL: no supported video mime for choice "' + $('fmt').value + '"');
+      $('expStatus').className = 'status warn';
+      $('expStatus').textContent = 'No supported video format for that choice. Try Auto or the other format.';
+      return;
+    }
+
+    stopPreview();
+    exporting = true;               // set first so a double tap can't start two exports
+    cancelRequested = false; hiddenDuring = false;
+    refreshButtons();
+    syncCfg();
+    rebuildLayer();
+    $('resultCard').classList.add('hide');
+    $('prog').style.width = '0%';
+
+    await getCtx().resume();
+    await lockScreen();
+
+    const dest = ac.createMediaStreamDestination();
+    const vStream = cv.captureStream(FPS);
+    const stream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const vbps = Math.max(1500000, Math.min(6000000, Math.round(W * H * FPS * 0.1)));
+
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: vbps, audioBitsPerSecond: 128000 });
+    } catch (e) {
+      log('FAIL: MediaRecorder constructor: ' + e.message);
+      vStream.getTracks().forEach(t => t.stop());
+      endExportUI('Could not start the encoder: ' + e.message, 'warn');
+      return;
+    }
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    let recErr = null;
+    recorder.onerror = e => { recErr = (e.error && e.error.message) || 'unknown recorder error'; log('Recorder error: ' + recErr); };
+
+    const dur = audioBuffer.duration;
+    playDur = dur;
+    drawCount = 0; worstGap = 0; lastDraw = 0; uiTick = 0;
+    const t0 = performance.now();
+    log(`Export start: ${W}x${H}@${FPS}, ${vbps} bps target, mime=${recorder.mimeType || mime}, audio=${dur.toFixed(1)}s, style=${state.style}, bg=${state.bg}, ratio=${state.ratio}, glow=${cfg.glow ? 'on' : 'off'}, boost=${$('boost').checked ? 'on' : 'off'}`);
+
+    const done = new Promise(res => { recorder.onstop = res; });
+    const src = buildChain(dest);
+    src.onended = () => setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 400);
+
+    drawFrame(0, false); // make sure a frame exists before capture starts
+    recorder.start(1000);
+    playStartAt = ac.currentTime;
+    src.start();
+    requestAnimationFrame(loop);
+
+    let timedOut = false, resumeTried = false;
+    const watch = setInterval(() => {
+      if (cancelRequested) {
+        clearInterval(watch);
+        try { src.onended = null; src.stop(); } catch (_) {}
+        if (recorder.state !== 'inactive') recorder.stop();
+      } else if (performance.now() - t0 > (dur + 20) * 1000) {
+        timedOut = true;
+        clearInterval(watch);
+        try { src.onended = null; src.stop(); } catch (_) {}
+        if (recorder.state !== 'inactive') recorder.stop();
+      } else if (ac.state !== 'running' && !resumeTried) {
+        resumeTried = true;
+        log('AudioContext state during export: ' + ac.state + ' (trying to resume)');
+        ac.resume();
+      }
+    }, 150);
+
+    await done;
+    clearInterval(watch);
+    const wall = (performance.now() - t0) / 1000;
+    exporting = false; // stops the draw loop
+    try { analyser.disconnect(); gainNode.disconnect(); } catch (_) {}
+    vStream.getTracks().forEach(t => t.stop());
+
+    if (cancelRequested) {
+      log('Export cancelled by user');
+      endExportUI('Export cancelled.');
+      return;
+    }
+    if (timedOut) {
+      log(`FAIL: export stalled (audio clock did not finish within ${(dur + 20).toFixed(0)}s). hiddenDuringExport=${hiddenDuring}`);
+      endExportUI('Export stalled. This usually means the screen locked or the tab went to the background. Keep the screen on and try again.', 'warn');
+      return;
+    }
+
+    const actualType = (recorder.mimeType || mime).split(';')[0];
+    const ext = actualType.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(chunks, { type: actualType });
+    const drawFps = drawCount / wall;
+
+    log('=== EXPORT SUMMARY ===');
+    log(`size ${W}x${H} | style ${state.style} | bg ${state.bg} | glow ${cfg.glow ? 'on' : 'off'} | boost ${$('boost').checked ? 'on' : 'off'}`);
+    log(`audio ${dur.toFixed(1)}s | export wall time ${wall.toFixed(1)}s (${(wall / dur).toFixed(2)}x real time)`);
+    log(`draw rate avg ${drawFps.toFixed(1)} fps (target ${FPS}) | worst gap ${worstGap.toFixed(0)} ms` + (drawFps < FPS * 0.85 ? '  <-- LOW: device struggled' : ''));
+    log(`codec ${recorder.mimeType || mime} | file ${(blob.size / 1024 / 1024).toFixed(2)} MB .${ext} | chunks ${chunks.length}`);
+    const codecPart = ((recorder.mimeType || mime).split('codecs=')[1] || '').toLowerCase();
+    const oddMp4 = ext === 'mp4' && codecPart && !/avc1|h264/.test(codecPart);
+    if (oddMp4) log(`WARNING: .mp4 file uses "${codecPart}" instead of H.264/AAC. WhatsApp and Instagram may reject it. Try Format: auto or Force WebM.`);
+    else if (ext === 'mp4' && !codecPart) log('Note: the browser did not report which codecs the .mp4 uses. Safari normally gives H.264/AAC here.');
+    log(`hidden during export: ${hiddenDuring ? 'YES (frames may have frozen)' : 'no'} | wake lock: ${wakeOk ? 'yes' : 'no'} | recorder error: ${recErr || 'none'}`);
+
+    if (!blob.size) {
+      log('FAIL: empty blob');
+      endExportUI('Export produced an empty file. See the report.', 'warn');
+      return;
+    }
+    if (oddMp4) endExportUI(`Done, but this .mp4 uses ${codecPart} instead of H.264. Social apps may reject it, so test posting before trusting it.`, 'warn');
+    else endExportUI(`Done in ${wall.toFixed(1)}s. Check playback below, then try posting it.`);
+    $('prog').style.width = '100%';
+    showResult(blob, ext, actualType);
+  });
+
+  function setPill(cls, text) { const p = $('resPill'); p.className = 'pill ' + cls; p.textContent = text; }
+
+  function showResult(blob, ext, type) {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    blobUrl = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const name = `voice-video-${stamp}.${ext}`;
+    const a = $('dl'); a.href = blobUrl; a.download = name;
+    const v = $('outVideo');
+    v.onloadedmetadata = () => log(`Result video metadata OK: ${v.videoWidth}x${v.videoHeight}, duration=${isFinite(v.duration) ? v.duration.toFixed(2) + 's' : 'Infinity (normal for browser-made WebM; not an error)'}`);
+    v.onerror = () => { log('Result video FAILED to play in this browser'); setPill('bad', 'Will not play'); };
+    v.onplaying = () => { log('Result video playback started'); setPill('good', `.${ext} plays here`); };
+    v.src = blobUrl;
+    setPill('', `.${ext} · ${(blob.size / 1024 / 1024).toFixed(1)} MB`);
+    $('resultCard').classList.remove('hide');
+
+    const file = new File([blob], name, { type });
+    const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+    $('shareBtn').classList.toggle('hide', !canShare);
+    $('shareBtn').onclick = async () => {
+      try { await navigator.share({ files: [file], title: 'Voice video' }); log('Share sheet opened/completed'); }
+      catch (e) { log('Share cancelled/failed: ' + e.name); }
+    };
+    log('Native share with file: ' + (canShare ? 'supported' : 'NOT supported (download only)'));
+  }
+
+  // ---------- report tools ----------
+  $('copyBtn').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(logEl.textContent); $('copyBtn').textContent = 'Copied'; }
+    catch (_) {
+      const r = document.createRange(); r.selectNodeContents(logEl);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      $('copyBtn').textContent = 'Selected: copy manually';
+    }
+    setTimeout(() => { $('copyBtn').textContent = 'Copy report'; }, 2000);
+  });
+  $('clearBtn').addEventListener('click', () => { logEl.textContent = ''; });
+
+  document.addEventListener('visibilitychange', () => {
+    if (exporting) { hiddenDuring = hiddenDuring || document.visibilityState === 'hidden'; log('Tab visibility changed to: ' + document.visibilityState + ' (frames may freeze)'); }
+  });
+
+  redrawIdle();
+  refreshButtons();
+})();
+</script>
+</body>
+</html>
