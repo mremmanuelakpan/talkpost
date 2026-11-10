@@ -1,4 +1,4 @@
-# Voice-to-Video Studio (prototype v2)
+# Voice-to-Video Studio (prototype v3)
 
 A single-file, browser-only prototype that turns a voice recording into a shareable video. No backend, no accounts: audio is processed locally in the browser.
 
@@ -14,6 +14,7 @@ To use GitHub Pages: repo Settings > Pages > Deploy from branch > `main` / root.
 
 ## What it does
 
+- One-screen mobile layout: the preview stays on top, and five swipeable cards (Audio, Visual, Backdrop, Text, Format) sit below it with Generate pinned at the bottom
 - Record or upload audio
 - Two visual styles: waveform line and equaliser bars
 - Backgrounds: gradient, solid colour, or your own image
@@ -21,7 +22,7 @@ To use GitHub Pages: repo Settings > Pages > Deploy from branch > `main` / root.
 - Title, subtitle, font and text size, optional glow
 - Boosts quiet audio toward a speech-friendly level
 - Exports MP4 (H.264/AAC) when the browser supports it, otherwise WebM
-- Diagnostics report you can copy after each export
+- Diagnostics report (tap Report, then Copy report) you can paste after each export
 
 ## Known limits
 
